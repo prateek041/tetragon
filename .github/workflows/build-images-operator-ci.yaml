@@ -1,13 +1,7 @@
-name: Image CI Build
+name: Image CI Operator Build
 
 on:
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
-    paths-ignore:
-      - 'docs/**'
+  pull_request:
   push:
     branches:
       - main
@@ -26,11 +20,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: tetragon
-            dockerfile: ./Dockerfile
-
           - name: tetragon-operator
-            dockerfile: ./Dockerfile.operator
+            dockerfile: ./tetragonpod/Dockerfile
 
     steps:
       # https://github.com/docker/setup-qemu-action
@@ -100,7 +91,7 @@ jobs:
       - name: Sign Container Image
         if: github.event_name == 'push'
         env:
-          COSIGN_EXPERIMENTAL: "true"
+          COSIGN_EXPERIMENTAL: 'true'
         run: |
           cosign sign quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci@${{ steps.docker_build_ci_main.outputs.digest }}
 
@@ -121,7 +112,7 @@ jobs:
       - name: Sign SBOM Image
         if: github.event_name == 'push'
         env:
-          COSIGN_EXPERIMENTAL: "true"
+          COSIGN_EXPERIMENTAL: 'true'
         run: |
           docker_build_ci_main_digest="${{ steps.docker_build_ci_main.outputs.digest }}"
           image_name="quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${docker_build_ci_main_digest/:/-}.sbom"
@@ -134,6 +125,12 @@ jobs:
         run: |
           mkdir -p image-digest/
           echo "quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}@${{ steps.docker_build_ci_main.outputs.digest }}" >> image-digest/${{ matrix.name }}.txt
+
+      # This is to check if the matrix build is
+      - name: Check if building tetragonpod controller image
+        id: suffix
+        run: |
+          echo "value=-podinfo" >> $GITHUB_OUTPUT
 
       # PR updates
       - name: CI Build (PR)
@@ -149,12 +146,12 @@ jobs:
           build-args: |
             TETRAGON_VERSION=${{ env.TETRAGON_VERSION }}
           tags: |
-            quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}
+            quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}${{steps.suffix.outputs.value}}
 
       - name: Sign Container Image
         if: github.event_name == 'pull_request_target' || github.event_name == 'pull_request'
         env:
-          COSIGN_EXPERIMENTAL: "true"
+          COSIGN_EXPERIMENTAL: 'true'
         run: |
           cosign sign quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci@${{ steps.docker_build_ci_pr.outputs.digest }}
 
@@ -163,19 +160,19 @@ jobs:
         shell: bash
         # To-Do: Format SBOM output to JSON after a new version of cosign is released after v1.13.1. Ref: https://github.com/sigstore/cosign/pull/2479
         run: |
-          bom generate --format json -o sbom_ci_pr_${{ matrix.name }}_${{ steps.tag.outputs.tag }}.spdx \
+          bom generate --format json -o sbom_ci_pr_${{ matrix.name }}_${{ steps.tag.outputs.tag }}${{steps.suffix.outputs.value}}.spdx \
           --dirs=. \
-          --image=quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}
+          --image=quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}${{steps.suffix.outputs.value}}
 
       - name: Attach SBOM to container images
         if: github.event_name == 'pull_request_target' || github.event_name == 'pull_request'
         run: |
-          cosign attach sbom --sbom sbom_ci_pr_${{ matrix.name }}_${{ steps.tag.outputs.tag }}.spdx quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci@${{ steps.docker_build_ci_pr.outputs.digest }}
+          cosign attach sbom --sbom sbom_ci_pr_${{ matrix.name }}_${{ steps.tag.outputs.tag }}${{steps.suffix.outputs.value}}.spdx quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci@${{ steps.docker_build_ci_pr.outputs.digest }}
 
       - name: Sign SBOM Image
         if: github.event_name == 'pull_request_target' || github.event_name == 'pull_request'
         env:
-          COSIGN_EXPERIMENTAL: "true"
+          COSIGN_EXPERIMENTAL: 'true'
         run: |
           docker_build_ci_pr_digest="${{ steps.docker_build_ci_pr.outputs.digest }}"
           image_name="quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${docker_build_ci_pr_digest/:/-}.sbom"
@@ -187,7 +184,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p image-digest/
-          echo "quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}@${{ steps.docker_build_ci_pr.outputs.digest }}" >> image-digest/${{ matrix.name }}.txt
+          echo "quay.io/${{ github.repository_owner }}/${{ matrix.name }}-ci:${{ steps.tag.outputs.tag }}${{steps.suffix.outputs.value}}@${{ steps.docker_build_ci_pr.outputs.digest }}" >> image-digest/${{ matrix.name }}.txt
 
       # Upload artifact digests
       - name: Upload artifact digests
