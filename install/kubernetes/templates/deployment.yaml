@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels: {{- include "tetragonPod-controller.labels" . | nindent 4 }}
-  {{ -end }}
-  name: {{ .Chart.Name }}Pod-controller
+  labels: 
+    {{- include "tetragonPod-controller.labels" . | nindent 4 }}
+  name: {{ .Chart.Name }}-pod-controller
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
-      {{- include "tetragonPod-controller.labels" . | nindent 4 }}
+      {{- include "tetragonPod-controller.labels" . | nindent 6 }}
   replicas: 1
   template:
     metadata:
-      labels: {{- include "tetragonPod-controller.labels" . | nindent 4 }}
-      {{ -end }}
+      labels: 
+        {{- include "tetragonPod-controller.labels" . | nindent 8 }}
     spec:
       securityContext:
         runAsNonRoot: true
-        {{- if .Values.tetragonPod.enabled }}
+      {{- if .Values.tetragonPod.enabled }}
       containers:
-      - name: {{ .Chart.Name }}Pod
+      - name: {{ .Chart.Name }}-pod
         image: "{{ if .Values.tetragonPod.image.override }}{{ .Values.tetragonPod.image.override }}{{ else }}{{ .Values.tetragonPod.image.repository }}:{{ .Values.tetragonPod.image.tag | default .Chart.AppVersion }}{{ end }}"
         securityContext:
           allowPrivilegeEscalation: false
@@ -45,6 +45,6 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-      serviceAccountName: {{ .Chart.Name }}Pod-controller-service-account
+      serviceAccountName: {{ .Chart.Name }}-pod-controller-service-account
       terminationGracePeriodSeconds: 10
-    
+      {{- end }}

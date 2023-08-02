@@ -2,7 +2,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{.Chart.Name}}Pod-controller-role
+  name: {{.Chart.Name}}-pod-controller-role
   labels:
   {{- include "tetragonPod-controller.labels" . | nindent 4 }}
 rules:
